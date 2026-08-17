@@ -1,16 +1,1 @@
-[
-  {
-    "id": "sample-1",
-    "title": "Big Buck Bunny",
-    "youtubeId": "aqz-KE-bpKQ",
-    "description": "Sample entry — replace with your own YouTube-hosted content.",
-    "addedAt": "2026-08-17"
-  },
-  {
-    "id": "m-1786961124762",
-    "title": "spider1",
-    "youtubeId": "<iframe   src=\"https://yapgrid.com/embed/movie/550?autoplay=1&lang=en\"   style=\"width:100%; aspect-ratio:16/9; border:0\"   allowFullScreen   allow=\"autoplay; fullscreen; picture-in-picture\" ></iframe>",
-    "description": "",
-    "addedAt": "2026-08-17"
-  }
-]
+[]
