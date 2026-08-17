@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChillCinema — Admin</title>
+<style>
+  :root{
+    --bg:#0d0f14; --panel:#171a21; --accent:#e63946;
+    --text:#eef1f5; --muted:#8b93a1; --ok:#3ddc84;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:'Segoe UI',Roboto,Arial,sans-serif;
+    display:flex; justify-content:center; padding:40px 20px;
+  }
+  .wrap{ width:100%; max-width:640px; }
+  h1{ font-size:24px; margin-bottom:6px; }
+  h1 span{ color:var(--accent); }
+  .sub{ color:var(--muted); font-size:13px; margin-bottom:28px; }
+  .card{
+    background:var(--panel); border:1px solid #23262f;
+    border-radius:12px; padding:24px; margin-bottom:20px;
+  }
+  label{ display:block; font-size:13px; color:var(--muted); margin:14px 0 6px; }
+  input, textarea{
+    width:100%; background:#0f1116; border:1px solid #2a2e38;
+    border-radius:8px; padding:10px 12px; color:var(--text); font-size:14px;
+    font-family:inherit;
+  }
+  textarea{ resize:vertical; min-height:70px; }
+  button{
+    margin-top:20px; width:100%; padding:12px;
+    background:var(--accent); border:none; border-radius:8px;
+    color:#fff; font-size:15px; font-weight:600; cursor:pointer;
+  }
+  button:disabled{ opacity:0.5; cursor:not-allowed; }
+  button.secondary{
+    background:transparent; border:1px solid #2a2e38; color:var(--muted);
+  }
+  #status{
+    margin-top:14px; font-size:13px; white-space:pre-wrap;
+  }
+  #status.ok{ color:var(--ok); }
+  #status.err{ color:var(--accent); }
+  .list-item{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:10px 0; border-bottom:1px solid #23262f; font-size:14px;
+  }
+  .list-item:last-child{ border-bottom:none; }
+  .list-item button{
+    width:auto; margin:0; padding:6px 12px; font-size:12px;
+    background:transparent; border:1px solid #2a2e38; color:var(--muted);
+  }
+  .list-item button:hover{ color:var(--accent); border-color:var(--accent); }
+  small.hint{ color:var(--muted); display:block; margin-top:4px; }
+  a{ color:var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Chill<span>Cinema</span> Admin</h1>
+  <p class="sub">Add, list, or remove titles. Changes commit straight to your GitHub repo.</p>
+
+  <div class="card">
+    <label>GitHub repo <small class="hint">format: username/repo-name</small></label>
+    <input id="repo" placeholder="yourname/chillcinema">
+
+    <label>Branch <small class="hint">usually "main"</small></label>
+    <input id="branch" value="main">
+
+    <label>Personal access token <small class="hint">
+      Fine-grained token, "Contents: Read and write" on this repo only.
+      Never share it or paste it anywhere else. It's kept only in this browser tab.
+      <a href="https://github.com/settings/personal-access-tokens/new" target="_blank">Create one here →</a>
+    </small></label>
+    <input id="token" type="password" placeholder="github_pat_...">
+
+    <button class="secondary" onclick="connect()">Connect &amp; load current list</button>
+    <div id="status"></div>
+  </div>
+
+  <div class="card" id="add-card" style="display:none;">
+    <label>Title</label>
+    <input id="title" placeholder="Movie title">
+
+    <label>YouTube video ID <small class="hint">
+      the part after watch?v= in the YouTube URL, e.g. dQw4w9WgXcQ
+    </small></label>
+    <input id="youtubeId" placeholder="dQw4w9WgXcQ">
+
+    <label>Description (optional)</label>
+    <textarea id="description" placeholder="Short description shown on the card"></textarea>
+
+    <button onclick="addMovie()" id="add-btn">Add to site</button>
+  </div>
+
+  <div class="card" id="list-card" style="display:none;">
+    <label style="margin-top:0;">Current titles</label>
+    <div id="movie-list"></div>
+  </div>
+</div>
+
+<script>
+  let sha = null;
+  let movies = [];
+
+  function setStatus(msg, type) {
+    const el = document.getElementById('status');
+    el.textContent = msg;
+    el.className = type || '';
+  }
+
+  function ghHeaders() {
+    return {
+      'Authorization': 'Bearer ' + document.getElementById('token').value.trim(),
+      'Accept': 'application/vnd.github+json'
+    };
+  }
+
+  function apiUrl() {
+    const repo = document.getElementById('repo').value.trim();
+    return `https://api.github.com/repos/${repo}/contents/movies.json`;
+  }
+
+  async function connect() {
+    setStatus('Loading movies.json…');
+    try {
+      const branch = document.getElementById('branch').value.trim() || 'main';
+      const res = await fetch(apiUrl() + '?ref=' + branch, { headers: ghHeaders() });
+      if (!res.ok) throw new Error(`GitHub API error ${res.status}: ${(await res.json()).message}`);
+      const data = await res.json();
+      sha = data.sha;
+      const content = decodeURIComponent(escape(atob(data.content)));
+      movies = JSON.parse(content);
+      renderList();
+      document.getElementById('add-card').style.display = 'block';
+      document.getElementById('list-card').style.display = 'block';
+      setStatus('Connected. Loaded ' + movies.length + ' title(s).', 'ok');
+    } catch (e) {
+      setStatus('Failed: ' + e.message, 'err');
+    }
+  }
+
+  function renderList() {
+    const el = document.getElementById('movie-list');
+    el.innerHTML = '';
+    if (movies.length === 0) {
+      el.innerHTML = '<p style="color:var(--muted);font-size:13px;">No titles yet.</p>';
+      return;
+    }
+    movies.forEach((m, i) => {
+      const row = document.createElement('div');
+      row.className = 'list-item';
+      row.innerHTML = `<span>${escapeHtml(m.title)}</span>`;
+      const btn = document.createElement('button');
+      btn.textContent = 'Remove';
+      btn.onclick = () => removeMovie(i);
+      row.appendChild(btn);
+      el.appendChild(row);
+    });
+  }
+
+  async function commit(commitMessage) {
+    const branch = document.getElementById('branch').value.trim() || 'main';
+    const body = {
+      message: commitMessage,
+      content: btoa(unescape(encodeURIComponent(JSON.stringify(movies, null, 2)))),
+      sha: sha,
+      branch: branch
+    };
+    const res = await fetch(apiUrl(), {
+      method: 'PUT',
+      headers: ghHeaders(),
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error(`GitHub API error ${res.status}: ${(await res.json()).message}`);
+    const data = await res.json();
+    sha = data.content.sha;
+  }
+
+  async function addMovie() {
+    const title = document.getElementById('title').value.trim();
+    const youtubeId = document.getElementById('youtubeId').value.trim();
+    const description = document.getElementById('description').value.trim();
+
+    if (!title || !youtubeId) {
+      setStatus('Title and YouTube video ID are required.', 'err');
+      return;
+    }
+
+    const btn = document.getElementById('add-btn');
+    btn.disabled = true;
+    setStatus('Committing to GitHub…');
+
+    movies.push({
+      id: 'm-' + Date.now(),
+      title, youtubeId, description,
+      addedAt: new Date().toISOString().slice(0,10)
+    });
+
+    try {
+      await commit(`Add "${title}" via admin panel`);
+      renderList();
+      document.getElementById('title').value = '';
+      document.getElementById('youtubeId').value = '';
+      document.getElementById('description').value = '';
+      setStatus('Added and pushed. Live on the site in ~1 minute (GitHub Pages build time).', 'ok');
+    } catch (e) {
+      movies.pop(); // roll back local state on failure
+      setStatus('Failed: ' + e.message, 'err');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function removeMovie(index) {
+    const removed = movies[index];
+    movies.splice(index, 1);
+    setStatus('Removing "' + removed.title + '"…');
+    try {
+      await commit(`Remove "${removed.title}" via admin panel`);
+      renderList();
+      setStatus('Removed and pushed.', 'ok');
+    } catch (e) {
+      movies.splice(index, 0, removed); // roll back
+      renderList();
+      setStatus('Failed: ' + e.message, 'err');
+    }
+  }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replaceAll('&','&amp;').replaceAll('<','&lt;')
+      .replaceAll('>','&gt;').replaceAll('"','&quot;');
+  }
+</script>
+</body>
+</html>
