@@ -73,7 +73,7 @@
     <label>Personal access token <small class="hint">
       Fine-grained token, "Contents: Read and write" on this repo only.
       Never share it or paste it anywhere else. It's kept only in this browser tab.
-      <a href="https://github.com/settings/personal-access-tokens/new" target="_blank">Create one here →</a>
+      <a href="https://github.com" target="_blank">Create one here →</a>
     </small></label>
     <input id="token" type="password" placeholder="github_pat_...">
 
@@ -85,10 +85,11 @@
     <label>Title</label>
     <input id="title" placeholder="Movie title">
 
-    <label>Video Source Link / ID <small class="hint">
-      Paste a full Yapgrid URL link (https://yapgrid.com...) OR a normal 11-digit YouTube ID.
-    </small></label>
+    <label>Video Source Link / ID</label>
     <input id="youtubeId" placeholder="https://yapgrid.com... or dQw4w9WgXcQ">
+
+    <label>Thumbnail Image URL (Optional)</label>
+    <input id="thumbnailUrl" placeholder="https://example.com or local name">
 
     <label>Description (optional)</label>
     <textarea id="description" placeholder="Short description shown on the card"></textarea>
@@ -121,7 +122,7 @@
 
   function apiUrl() {
     const repo = document.getElementById('repo').value.trim();
-    return `https://api.github.com/repos/${repo}/contents/movies.json`;
+    return `https://github.com{repo}/contents/movies.json`;
   }
 
   async function connect() {
@@ -183,6 +184,7 @@
   async function addMovie() {
     const title = document.getElementById('title').value.trim();
     const youtubeId = document.getElementById('youtubeId').value.trim();
+    const thumbnailUrl = document.getElementById('thumbnailUrl').value.trim();
     const description = document.getElementById('description').value.trim();
 
     if (!title || !youtubeId) {
@@ -196,7 +198,10 @@
 
     movies.push({
       id: 'm-' + Date.now(),
-      title, youtubeId, description,
+      title, 
+      youtubeId, 
+      thumbnailUrl, // Custom stored thumbnail link
+      description,
       addedAt: new Date().toISOString().slice(0,10)
     });
 
@@ -205,10 +210,11 @@
       renderList();
       document.getElementById('title').value = '';
       document.getElementById('youtubeId').value = '';
+      document.getElementById('thumbnailUrl').value = '';
       document.getElementById('description').value = '';
       setStatus('Added and pushed. Live on the site in ~1 minute (GitHub Pages build time).', 'ok');
     } catch (e) {
-      movies.pop(); // roll back local state on failure
+      movies.pop();
       setStatus('Failed: ' + e.message, 'err');
     } finally {
       btn.disabled = false;
@@ -224,7 +230,7 @@
       renderList();
       setStatus('Removed and pushed.', 'ok');
     } catch (e) {
-      movies.splice(index, 0, removed); // roll back
+      movies.splice(index, 0, removed);
       renderList();
       setStatus('Failed: ' + e.message, 'err');
     }
