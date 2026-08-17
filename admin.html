@@ -85,10 +85,10 @@
     <label>Title</label>
     <input id="title" placeholder="Movie title">
 
-    <label>YouTube video ID <small class="hint">
-      the part after watch?v= in the YouTube URL, e.g. dQw4w9WgXcQ
+    <label>Video Source Link / ID <small class="hint">
+      Paste a full Yapgrid URL link (https://yapgrid.com...) OR a normal 11-digit YouTube ID.
     </small></label>
-    <input id="youtubeId" placeholder="dQw4w9WgXcQ">
+    <input id="youtubeId" placeholder="https://yapgrid.com... or dQw4w9WgXcQ">
 
     <label>Description (optional)</label>
     <textarea id="description" placeholder="Short description shown on the card"></textarea>
@@ -186,7 +186,7 @@
     const description = document.getElementById('description').value.trim();
 
     if (!title || !youtubeId) {
-      setStatus('Title and YouTube video ID are required.', 'err');
+      setStatus('Title and Video Source are required.', 'err');
       return;
     }
 
