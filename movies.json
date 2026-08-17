@@ -5,5 +5,12 @@
     "youtubeId": "aqz-KE-bpKQ",
     "description": "Sample entry — replace with your own YouTube-hosted content.",
     "addedAt": "2026-08-17"
+  },
+  {
+    "id": "m-1786959221478",
+    "title": "SpiderMan Brand New",
+    "youtubeId": "https://yapgrid.com/embed/movie/{id}?autoplay=1",
+    "description": "watch it",
+    "addedAt": "2026-08-17"
   }
 ]
