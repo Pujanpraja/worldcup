@@ -224,16 +224,21 @@
     filtered.forEach(m => {
       const isFullUrl = checkIsFullUrl(m.youtubeId);
       
-      // Beautiful default velvet theater curtain photo for custom links
-      const thumbSrc = isFullUrl 
-        ? "https://unsplash.com" 
-        : `https://youtube.com{m.youtubeId}/hqdefault.jpg`;
+      // 1. If you input a custom image URL, use it.
+      // 2. If no image URL is provided but it's a full link, use a cinematic fall-back.
+      // 3. Otherwise, fetch standard YouTube artwork.
+      let thumbSrc = m.thumbnailUrl;
+      if (!thumbSrc) {
+        thumbSrc = isFullUrl 
+          ? "https://unsplash.com" 
+          : `https://youtube.com{m.youtubeId}/hqdefault.jpg`;
+      }
 
       const card = document.createElement('div');
       card.className = 'card';
       card.onclick = () => playMovie(m);
       card.innerHTML = `
-        <img class="thumb" src="${thumbSrc}" alt="${escapeHtml(m.title)}">
+        <img class="thumb" src="${thumbSrc}" alt="${escapeHtml(m.title)}" onerror="this.src='https://unsplash.com'">
         <div class="card-body">
           <h3>${escapeHtml(m.title)}</h3>
           <p>${escapeHtml(m.description || '')}</p>
@@ -246,7 +251,6 @@
   function playMovie(m) {
     const isFullUrl = checkIsFullUrl(m.youtubeId);
     
-    // Automatically use the correct source attribute path format
     const embedUrl = isFullUrl 
       ? m.youtubeId 
       : `https://youtube.com{m.youtubeId}?autoplay=1&rel=0`;
