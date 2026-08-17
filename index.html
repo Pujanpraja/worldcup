@@ -199,10 +199,10 @@
     renderGrid();
   }
 
-  function checkIsFullUrl(idString) {
+  function checkIsExternalUrl(idString) {
     if (!idString) return false;
     const cleanStr = String(idString).trim().toLowerCase();
-    return cleanStr.startsWith('http://') || cleanStr.startsWith('https://');
+    return cleanStr.startsWith('http://') || cleanStr.startsWith('https://') || cleanStr.includes('yapgrid.com');
   }
 
   function renderGrid() {
@@ -222,14 +222,12 @@
     empty.style.display = 'none';
 
     filtered.forEach(m => {
-      const isFullUrl = checkIsFullUrl(m.youtubeId);
+      const isExternal = checkIsExternalUrl(m.youtubeId);
       
-      // 1. If you input a custom image URL, use it.
-      // 2. If no image URL is provided but it's a full link, use a cinematic fall-back.
-      // 3. Otherwise, fetch standard YouTube artwork.
+      // Look for a custom thumbnail link from admin panel. If missing, fall back accordingly.
       let thumbSrc = m.thumbnailUrl;
       if (!thumbSrc) {
-        thumbSrc = isFullUrl 
+        thumbSrc = isExternal 
           ? "https://unsplash.com" 
           : `https://youtube.com{m.youtubeId}/hqdefault.jpg`;
       }
@@ -249,11 +247,13 @@
   }
 
   function playMovie(m) {
-    const isFullUrl = checkIsFullUrl(m.youtubeId);
+    const isExternal = checkIsExternalUrl(m.youtubeId);
+    const cleanId = String(m.youtubeId || "").trim();
     
-    const embedUrl = isFullUrl 
-      ? m.youtubeId 
-      : `https://youtube.com{m.youtubeId}?autoplay=1&rel=0`;
+    // Explicitly select between a raw direct source link or building a standard YouTube shell address
+    const embedUrl = isExternal 
+      ? cleanId 
+      : `https://youtube.com{cleanId}?autoplay=1&rel=0`;
 
     document.getElementById('player-section').style.display = 'block';
     document.getElementById('player-wrap').innerHTML = `
