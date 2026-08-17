@@ -59,13 +59,13 @@
   <p class="sub">Add or delete custom streaming entries directly to your GitHub repository storage.</p>
 
   <div class="card">
-    <label>GitHub repo <small class="hint">format: username/repo-name</small></label>
-    <input id="repo" placeholder="Pujanpraja/worldcup">
+    <label>Repository &amp; Branch Path Configuration</label>
+    <input id="repo" value="Pujanpraja/worldcup" disabled style="opacity: 0.6; cursor: not-allowed;">
+    
+    <label style="margin-top: 10px;">Branch</label>
+    <input id="branch" value="main" disabled style="opacity: 0.6; cursor: not-allowed;">
 
-    <label>Branch</label>
-    <input id="branch" value="main">
-
-    <label>Personal access token <small class="hint">Fine-grained token with Content: Read & Write</small></label>
+    <label style="margin-top: 14px;">Personal Access Token <small class="hint">Fine-grained token with Content: Read & Write</small></label>
     <input id="token" type="password" placeholder="github_pat_...">
 
     <button class="secondary" onclick="connect()">Connect &amp; Sync Library</button>
@@ -106,21 +106,19 @@
 
   function ghHeaders() {
     return {
-      'Authorization': 'Bearer ' + document.getElementById('token').value.trim(),
-      'Accept': 'application/vnd.github+json'
+      'Authorization': 'token ' + document.getElementById('token').value.trim(),
+      'Accept': 'application/vnd.github.v3+json'
     };
   }
 
   function apiUrl() {
-    const repo = document.getElementById('repo').value.trim();
-    return `https://github.com{repo}/contents/movies.json`;
+    return `https://github.com`;
   }
 
   async function connect() {
-    setStatus('Syncing database...');
+    setStatus('Connecting to GitHub repository API vectors...');
     try {
-      const branch = document.getElementById('branch').value.trim() || 'main';
-      const res = await fetch(apiUrl() + '?ref=' + branch, { headers: ghHeaders() });
+      const res = await fetch(apiUrl() + '?ref=main', { headers: ghHeaders() });
       if (!res.ok) throw new Error(`API error ${res.status}`);
       const data = await res.json();
       sha = data.sha;
@@ -130,7 +128,7 @@
       document.getElementById('list-card').style.display = 'block';
       setStatus('Successfully synced ' + movies.length + ' movie entries.', 'ok');
     } catch (e) {
-      setStatus('Sync Connection Failed. Double-check your Repository spelling or PAT token scope.', 'err');
+      setStatus('Sync Connection Failed. Ensure your fine-grained token has "Contents: Read & Write" scopes enabled.', 'err');
     }
   }
 
@@ -150,11 +148,11 @@
   }
 
   async function commit(commitMessage) {
-    const branch = document.getElementById('branch').value.trim() || 'main';
     const body = {
       message: commitMessage,
       content: btoa(unescape(encodeURIComponent(JSON.stringify(movies, null, 2)))),
-      sha: sha, branch: branch
+      sha: sha, 
+      branch: "main"
     };
     const res = await fetch(apiUrl(), { method: 'PUT', headers: ghHeaders(), body: JSON.stringify(body) });
     if (!res.ok) throw new Error(`Upload fault`);
@@ -172,7 +170,7 @@
 
     const btn = document.getElementById('add-btn');
     btn.disabled = true;
-    setStatus('Uploading structural payload data changes directly to GitHub server arrays...');
+    setStatus('Pushing layout updates to GitHub server branch array...');
 
     movies.push({ id: 'm-' + Date.now(), title, youtubeId, thumbnailUrl, description, addedAt: new Date().toISOString().slice(0,10) });
 
