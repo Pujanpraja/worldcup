@@ -36,12 +36,8 @@
     color:#fff; font-size:15px; font-weight:600; cursor:pointer;
   }
   button:disabled{ opacity:0.5; cursor:not-allowed; }
-  button.secondary{
-    background:transparent; border:1px solid #2a2e38; color:var(--muted);
-  }
-  #status{
-    margin-top:14px; font-size:13px; white-space:pre-wrap;
-  }
+  button.secondary{ background:transparent; border:1px solid #2a2e38; color:var(--muted); }
+  #status{ margin-top:14px; font-size:13px; white-space:pre-wrap; }
   #status.ok{ color:var(--ok); }
   #status.err{ color:var(--accent); }
   .list-item{
@@ -55,29 +51,24 @@
   }
   .list-item button:hover{ color:var(--accent); border-color:var(--accent); }
   small.hint{ color:var(--muted); display:block; margin-top:4px; }
-  a{ color:var(--accent); }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>Chill<span>Cinema</span> Admin</h1>
-  <p class="sub">Add, list, or remove titles. Changes commit straight to your GitHub repo.</p>
+  <p class="sub">Add or delete custom streaming entries directly to your GitHub repository storage.</p>
 
   <div class="card">
     <label>GitHub repo <small class="hint">format: username/repo-name</small></label>
-    <input id="repo" placeholder="yourname/chillcinema">
+    <input id="repo" placeholder="Pujanpraja/worldcup">
 
-    <label>Branch <small class="hint">usually "main"</small></label>
+    <label>Branch</label>
     <input id="branch" value="main">
 
-    <label>Personal access token <small class="hint">
-      Fine-grained token, "Contents: Read and write" on this repo only.
-      Never share it or paste it anywhere else. It's kept only in this browser tab.
-      <a href="https://github.com" target="_blank">Create one here →</a>
-    </small></label>
+    <label>Personal access token <small class="hint">Fine-grained token with Content: Read & Write</small></label>
     <input id="token" type="password" placeholder="github_pat_...">
 
-    <button class="secondary" onclick="connect()">Connect &amp; load current list</button>
+    <button class="secondary" onclick="connect()">Connect &amp; Sync Library</button>
     <div id="status"></div>
   </div>
 
@@ -85,20 +76,20 @@
     <label>Title</label>
     <input id="title" placeholder="Movie title">
 
-    <label>Video Source Link / ID</label>
-    <input id="youtubeId" placeholder="https://yapgrid.com... or dQw4w9WgXcQ">
+    <label>Video Player URL / YouTube ID</label>
+    <input id="youtubeId" placeholder="https://yapgrid.com... OR YouTube code">
 
-    <label>Thumbnail Image URL (Optional)</label>
-    <input id="thumbnailUrl" placeholder="https://example.com or local name">
+    <label>Card Poster Image URL (Optional)</label>
+    <input id="thumbnailUrl" placeholder="https://example.com">
 
-    <label>Description (optional)</label>
-    <textarea id="description" placeholder="Short description shown on the card"></textarea>
+    <label>Description (Optional)</label>
+    <textarea id="description" placeholder="Short display overview..."></textarea>
 
-    <button onclick="addMovie()" id="add-btn">Add to site</button>
+    <button onclick="addMovie()" id="add-btn">Publish to Library</button>
   </div>
 
   <div class="card" id="list-card" style="display:none;">
-    <label style="margin-top:0;">Current titles</label>
+    <label style="margin-top:0;">Current Catalog Entries</label>
     <div id="movie-list"></div>
   </div>
 </div>
@@ -126,37 +117,32 @@
   }
 
   async function connect() {
-    setStatus('Loading movies.json…');
+    setStatus('Syncing database...');
     try {
       const branch = document.getElementById('branch').value.trim() || 'main';
       const res = await fetch(apiUrl() + '?ref=' + branch, { headers: ghHeaders() });
-      if (!res.ok) throw new Error(`GitHub API error ${res.status}: ${(await res.json()).message}`);
+      if (!res.ok) throw new Error(`API error ${res.status}`);
       const data = await res.json();
       sha = data.sha;
-      const content = decodeURIComponent(escape(atob(data.content)));
-      movies = JSON.parse(content);
+      movies = JSON.parse(decodeURIComponent(escape(atob(data.content))));
       renderList();
       document.getElementById('add-card').style.display = 'block';
       document.getElementById('list-card').style.display = 'block';
-      setStatus('Connected. Loaded ' + movies.length + ' title(s).', 'ok');
+      setStatus('Successfully synced ' + movies.length + ' movie entries.', 'ok');
     } catch (e) {
-      setStatus('Failed: ' + e.message, 'err');
+      setStatus('Sync Connection Failed. Double-check your Repository spelling or PAT token scope.', 'err');
     }
   }
 
   function renderList() {
     const el = document.getElementById('movie-list');
-    el.innerHTML = '';
-    if (movies.length === 0) {
-      el.innerHTML = '<p style="color:var(--muted);font-size:13px;">No titles yet.</p>';
-      return;
-    }
+    el.innerHTML = movies.length === 0 ? '<p style="color:var(--muted);font-size:13px;">No entries available.</p>' : '';
     movies.forEach((m, i) => {
       const row = document.createElement('div');
       row.className = 'list-item';
       row.innerHTML = `<span>${escapeHtml(m.title)}</span>`;
       const btn = document.createElement('button');
-      btn.textContent = 'Remove';
+      btn.textContent = 'Delete';
       btn.onclick = () => removeMovie(i);
       row.appendChild(btn);
       el.appendChild(row);
@@ -168,15 +154,10 @@
     const body = {
       message: commitMessage,
       content: btoa(unescape(encodeURIComponent(JSON.stringify(movies, null, 2)))),
-      sha: sha,
-      branch: branch
+      sha: sha, branch: branch
     };
-    const res = await fetch(apiUrl(), {
-      method: 'PUT',
-      headers: ghHeaders(),
-      body: JSON.stringify(body)
-    });
-    if (!res.ok) throw new Error(`GitHub API error ${res.status}: ${(await res.json()).message}`);
+    const res = await fetch(apiUrl(), { method: 'PUT', headers: ghHeaders(), body: JSON.stringify(body) });
+    if (!res.ok) throw new Error(`Upload fault`);
     const data = await res.json();
     sha = data.content.sha;
   }
@@ -187,59 +168,44 @@
     const thumbnailUrl = document.getElementById('thumbnailUrl').value.trim();
     const description = document.getElementById('description').value.trim();
 
-    if (!title || !youtubeId) {
-      setStatus('Title and Video Source are required.', 'err');
-      return;
-    }
+    if (!title || !youtubeId) { setStatus('Title and Video resource elements are mandatory.', 'err'); return; }
 
     const btn = document.getElementById('add-btn');
     btn.disabled = true;
-    setStatus('Committing to GitHub…');
+    setStatus('Uploading structural payload data changes directly to GitHub server arrays...');
 
-    movies.push({
-      id: 'm-' + Date.now(),
-      title, 
-      youtubeId, 
-      thumbnailUrl, // Custom stored thumbnail link
-      description,
-      addedAt: new Date().toISOString().slice(0,10)
-    });
+    movies.push({ id: 'm-' + Date.now(), title, youtubeId, thumbnailUrl, description, addedAt: new Date().toISOString().slice(0,10) });
 
     try {
-      await commit(`Add "${title}" via admin panel`);
+      await commit(`Add entry: "${title}"`);
       renderList();
       document.getElementById('title').value = '';
       document.getElementById('youtubeId').value = '';
       document.getElementById('thumbnailUrl').value = '';
       document.getElementById('description').value = '';
-      setStatus('Added and pushed. Live on the site in ~1 minute (GitHub Pages build time).', 'ok');
+      setStatus('Success! Posted database files. Changes propagate globally within 1 minute.', 'ok');
     } catch (e) {
       movies.pop();
-      setStatus('Failed: ' + e.message, 'err');
-    } finally {
-      btn.disabled = false;
-    }
+      setStatus('Write access failed.', 'err');
+    } finally { btn.disabled = false; }
   }
 
   async function removeMovie(index) {
     const removed = movies[index];
     movies.splice(index, 1);
-    setStatus('Removing "' + removed.title + '"…');
     try {
-      await commit(`Remove "${removed.title}" via admin panel`);
+      await commit(`Dropped catalog link item: "${removed.title}"`);
       renderList();
-      setStatus('Removed and pushed.', 'ok');
+      setStatus('Removed successfully.', 'ok');
     } catch (e) {
       movies.splice(index, 0, removed);
       renderList();
-      setStatus('Failed: ' + e.message, 'err');
+      setStatus('Removal request failed.', 'err');
     }
   }
 
   function escapeHtml(str) {
-    return String(str)
-      .replaceAll('&','&amp;').replaceAll('<','&lt;')
-      .replaceAll('>','&gt;').replaceAll('"','&quot;');
+    return String(str).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
   }
 </script>
 </body>
