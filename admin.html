@@ -59,11 +59,14 @@
   <p class="sub">Add or delete custom streaming entries directly to your GitHub repository storage.</p>
 
   <div class="card">
-    <label>Repository &amp; Branch Path Configuration</label>
-    <input id="repo" value="Pujanpraja/worldcup" disabled style="opacity: 0.6; cursor: not-allowed;">
-    
+    <label>Repository <small class="hint">Format: owner/repo, e.g. Pujanpraja/worldcup</small></label>
+    <input id="repo" value="Pujanpraja/worldcup" placeholder="owner/repo">
+
     <label style="margin-top: 10px;">Branch</label>
-    <input id="branch" value="main" disabled style="opacity: 0.6; cursor: not-allowed;">
+    <input id="branch" value="main" placeholder="main">
+
+    <label style="margin-top: 10px;">File Path <small class="hint">Path to the JSON file inside the repo</small></label>
+    <input id="filepath" value="movies.json" placeholder="movies.json">
 
     <label style="margin-top: 14px;">Personal Access Token <small class="hint">Fine-grained token with Content: Read & Write</small></label>
     <input id="token" type="password" placeholder="github_pat_...">
@@ -106,7 +109,7 @@
 
   function ghHeaders() {
     const token = document.getElementById('token').value.trim();
-    // Dynamically route token patterns (Fine-Grained demands Bearer parsing arrays)
+    // Fine-grained PATs (github_pat_...) use "Bearer"; classic PATs (ghp_...) use "token"
     const headerPrefix = token.startsWith('github_pat_') ? 'Bearer ' : 'token ';
     return {
       'Authorization': headerPrefix + token,
@@ -115,24 +118,61 @@
     };
   }
 
+  function getConfig() {
+    const repo = document.getElementById('repo').value.trim();
+    const branch = document.getElementById('branch').value.trim() || 'main';
+    const filepath = document.getElementById('filepath').value.trim() || 'movies.json';
+    return { repo, branch, filepath };
+  }
+
   function apiUrl() {
-    return `https://github.com`;
+    const { repo, filepath } = getConfig();
+    // filepath may contain slashes; encode each segment but keep the slashes
+    const encodedPath = filepath.split('/').map(encodeURIComponent).join('/');
+    return `https://api.github.com/repos/${repo}/contents/${encodedPath}`;
   }
 
   async function connect() {
-    setStatus('Connecting to GitHub repository API vectors...');
+    const { repo, branch, filepath } = getConfig();
+    if (!repo || !repo.includes('/')) {
+      setStatus('Enter a repository in the form owner/repo.', 'err');
+      return;
+    }
+    const token = document.getElementById('token').value.trim();
+    if (!token) {
+      setStatus('Enter a Personal Access Token first.', 'err');
+      return;
+    }
+
+    setStatus('Connecting to GitHub repository API...');
     try {
-      const res = await fetch(apiUrl() + '?ref=main', { headers: ghHeaders() });
-      if (!res.ok) throw new Error(`API error ${res.status}`);
+      const res = await fetch(`${apiUrl()}?ref=${encodeURIComponent(branch)}`, { headers: ghHeaders() });
+
+      if (res.status === 404) {
+        // File doesn't exist yet — treat as an empty catalog we can create on first save
+        sha = null;
+        movies = [];
+        renderList();
+        document.getElementById('add-card').style.display = 'block';
+        document.getElementById('list-card').style.display = 'block';
+        setStatus(`No "${filepath}" found yet on ${repo}@${branch} — it will be created on your first save.`, 'ok');
+        return;
+      }
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(`API error ${res.status}${errBody.message ? ': ' + errBody.message : ''}`);
+      }
+
       const data = await res.json();
       sha = data.sha;
-      movies = JSON.parse(decodeURIComponent(escape(atob(data.content))));
+      movies = data.content ? JSON.parse(decodeURIComponent(escape(atob(data.content)))) : [];
       renderList();
       document.getElementById('add-card').style.display = 'block';
       document.getElementById('list-card').style.display = 'block';
       setStatus('Successfully synced ' + movies.length + ' movie entries.', 'ok');
     } catch (e) {
-      setStatus('Sync Connection Failed. Ensure your token is valid and has "Contents: Read & Write" scopes enabled.', 'err');
+      setStatus('Sync Connection Failed: ' + e.message, 'err');
     }
   }
 
@@ -152,14 +192,19 @@
   }
 
   async function commit(commitMessage) {
+    const { branch } = getConfig();
     const body = {
       message: commitMessage,
       content: btoa(unescape(encodeURIComponent(JSON.stringify(movies, null, 2)))),
-      sha: sha, 
-      branch: "main"
+      branch: branch
     };
+    if (sha) body.sha = sha; // omit sha when creating the file for the first time
+
     const res = await fetch(apiUrl(), { method: 'PUT', headers: ghHeaders(), body: JSON.stringify(body) });
-    if (!res.ok) throw new Error(`Upload fault`);
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(`Upload failed (${res.status})${errBody.message ? ': ' + errBody.message : ''}`);
+    }
     const data = await res.json();
     sha = data.content.sha;
   }
@@ -174,7 +219,7 @@
 
     const btn = document.getElementById('add-btn');
     btn.disabled = true;
-    setStatus('Pushing layout updates to GitHub server branch array...');
+    setStatus('Pushing update to GitHub...');
 
     movies.push({ id: 'm-' + Date.now(), title, youtubeId, thumbnailUrl, description, addedAt: new Date().toISOString().slice(0,10) });
 
@@ -185,10 +230,10 @@
       document.getElementById('youtubeId').value = '';
       document.getElementById('thumbnailUrl').value = '';
       document.getElementById('description').value = '';
-      setStatus('Success! Posted database files. Changes propagate globally within 1 minute.', 'ok');
+      setStatus('Success! Changes propagate globally within 1 minute.', 'ok');
     } catch (e) {
       movies.pop();
-      setStatus('Write access failed.', 'err');
+      setStatus('Write access failed: ' + e.message, 'err');
     } finally { btn.disabled = false; }
   }
 
@@ -196,13 +241,13 @@
     const removed = movies[index];
     movies.splice(index, 1);
     try {
-      await commit(`Dropped catalog link item: "${removed.title}"`);
+      await commit(`Remove entry: "${removed.title}"`);
       renderList();
       setStatus('Removed successfully.', 'ok');
     } catch (e) {
       movies.splice(index, 0, removed);
       renderList();
-      setStatus('Removal request failed.', 'err');
+      setStatus('Removal request failed: ' + e.message, 'err');
     }
   }
 
